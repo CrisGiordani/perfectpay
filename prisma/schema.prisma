@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum Status {
+  WAITING_APPROVAL
+  ACTIVE
+  BLOCKED
+  REMOVED
+}
+
+enum StatusOrder {
+  CREATED
+  APPROVED
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+model User {
+  id         String   @id @default(uuid())
+  nome       String
+  email      String   @unique
+  celular    String   @unique
+  cpf        String   @unique
+  role       Role     @default(CLIENT)
+  password   String
+  status     Status   @default(ACTIVE)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  companies Company[]
+
+  @@map("users")
+}
+
+model Company {
+  id            String   @id @default(cuid())
+  responsavel   String
+  fornecedor    Boolean  @default(false)
+  comprador     Boolean  @default(false)
+  razao_social  String
+  nome_fantasia String
+  cnpj          String   @unique
+  endereco      String?
+  cidade        String?
+  uf            String?
+  cep           String?
+  latitude      Decimal
+  longitude     Decimal
+  detalhes      Json
+  status        Status   @default(WAITING_APPROVAL)
+  aproved_by    String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  compras          Order[]        @relation(name: "Comprador")
+  vendas           Order[]        @relation(name: "Fornecedor")
+  catalogo         Catalog[]
+  lista_de_compras ShoppingList[]
+  cotacoes         Quote[]
+
+  User User @relation(fields: [responsavel], references: [id])
+
+  @@map("companies")
+}
+
+model Product {
+  id            String       @id @default(uuid())
+  ncm           String?      @unique
+  cod_barras    String?      @unique
+  nome          String
+  descricao     String?
+  marca         String
+  embalagem     String
+  unidade       String
+  quantidade    Float
+  tag           String?
+  tags          String[]     @default([])
+  imagens       String[]     @default([])
+  status        Status       @default(WAITING_APPROVAL)
+  created_by    String
+  aproved_by    String?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @default(now())
+  catalogo      Catalog[]
+  items_pedidos OrderItems[]
+
+  @@map("products")
+}
+
+model Catalog {
+  id            String @id @default(uuid())
+  id_fornecedor String
+  id_produto    String
+  valor         Float
+  valor_medio   Float?
+
+  fornecedores Company @relation(fields: [id_fornecedor], references: [id])
+  produtos     Product @relation(fields: [id_produto], references: [id])
+
+  @@map("catalogs")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  id_comprador  String
+  id_fornecedor String
+  total         Float
+  status        StatusOrder @default(CREATED)
+
+  fornecedor Company @relation(name: "Fornecedor", fields: [id_fornecedor], references: [id])
+  comprador  Company @relation(name: "Comprador", fields: [id_comprador], references: [id])
+
+  itens     OrderItems[]
+  historico OrdersHistory[]
+
+  @@map("orders")
+}
+
+model OrderItems {
+  id         String @id @default(uuid())
+  id_pedido  String
+  id_produto String
+  valor      Float
+
+  qtd Int
+
+  pedido  Order   @relation(fields: [id_pedido], references: [id])
+  produto Product @relation(fields: [id_produto], references: [id])
+
+  @@map("orders_items")
+}
+
+model OrdersHistory {
+  id         String      @id @default(uuid())
+  id_pedido  String
+  status     StatusOrder @default(CREATED)
+  created_at DateTime    @default(now())
+  created_by String
+
+  order Order @relation(fields: [id_pedido], references: [id])
+
+  @@map("orders_history")
+}
+
+model ShoppingList {
+  id           String   @id @default(uuid())
+  id_comprador String
+  items        String[]
+  Company      Company  @relation(fields: [id_comprador], references: [id])
+
+  @@map("shoppinglists")
+}
+
+model Quote {
+  id           String   @id @default(uuid())
+  id_comprador String
+  items        Json
+  data         DateTime
+  Company      Company  @relation(fields: [id_comprador], references: [id])
+
+  @@map("quotes")
+}
